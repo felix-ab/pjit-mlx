@@ -19,6 +19,7 @@ from .text_encoder import TextEncoder
 
 ASPECT_RATIOS = {"square": (1024, 1024), "tall": (1216, 864), "4:3": (864, 1152), "3:2": (832, 1248), "16:9": (720, 1280)}
 REF_DIT, REF_QWEN = "Linum-AI/pjit-21k", "Qwen/Qwen3.5-4B"
+LOW_MEMORY_CACHE = 256 * 1024**2
 TIERS = {"bf16": "VisualInference/P-JiT-21K-MLX-bf16", "8bit": "VisualInference/P-JiT-21K-MLX-8bit"}
 
 
@@ -29,6 +30,21 @@ def _snapshot(repo: str, patterns=None) -> Path:
         return Path(snapshot_download(repo, local_files_only=True, allow_patterns=patterns))
     except Exception:
         return Path(snapshot_download(repo, allow_patterns=patterns))
+
+
+def footprint_gb() -> float | None:
+    """This process's peak physical footprint so far, as macOS reports it (the meter Activity Monitor and jetsam use;
+    it includes MLX's buffer cache and everything outside MLX, unlike mx.get_peak_memory())."""
+    import ctypes
+    import os
+
+    try:
+        buf = (ctypes.c_uint64 * 64)()
+        if ctypes.CDLL("/usr/lib/libproc.dylib").proc_pid_rusage(os.getpid(), 4, ctypes.cast(buf, ctypes.c_void_p)):
+            return None
+        return round(buf[2 + 28] / 1e9, 2)  # rusage_info_v4.ri_lifetime_max_phys_footprint, after the 16-byte uuid
+    except OSError:
+        return None
 
 
 def tier_paths(tier: str) -> tuple[Path, Path]:
@@ -67,11 +83,12 @@ def load_dit(path: str | Path | None = None, bits: int | None = None, group_size
 
 
 class Pipeline:
-    def __init__(self, dit_path=None, text_encoder_path=None, dit_bits=None, te_bits=None, tier=None):
+    def __init__(self, dit_path=None, text_encoder_path=None, dit_bits=None, te_bits=None, tier=None, low_memory=False):
         if tier:
             dit_path, text_encoder_path = tier_paths(tier)
         self.dit_path, self.te_path = dit_path, text_encoder_path
         self.dit_bits, self.te_bits = dit_bits, te_bits
+        self.low_memory = low_memory  # block-by-block evaluation and a 0.25 GB MLX buffer cache while sampling
         self.model = None
         self._features = {}  # caption -> (1, L, 7680) bf16, so further seeds of a prompt skip the encoder
 
@@ -87,9 +104,8 @@ class Pipeline:
                 from .quantize import quantize_text_encoder
 
                 quantize_text_encoder(te.model, {"bits": self.te_bits})
-            for c in todo:
-                self._features[c] = te(c)[None]
-            mx.eval(list(self._features.values()))
+            for c, f in zip(todo, te.encode_streaming(todo)):
+                self._features[c] = f[None]
             del te
             gc.collect()
             mx.clear_cache()
@@ -105,7 +121,13 @@ class Pipeline:
         if self.model is None:
             self.model = load_dit(self.dit_path, self.dit_bits)
         t_load = time.perf_counter() - t0 - t_text
-        img, info = sample(self.model, cond, uncond, seed, s, progress)
+        self.model.low_memory = self.low_memory
+        cache_limit = mx.set_cache_limit(LOW_MEMORY_CACHE) if self.low_memory else None
+        try:
+            img, info = sample(self.model, cond, uncond, seed, s, progress)
+        finally:
+            if cache_limit is not None:
+                mx.set_cache_limit(cache_limit)
         info.update(text_s=round(t_text, 2), load_s=round(t_load, 2), tokens=int(cond.shape[1]),
-                    peak_gb=round(mx.get_peak_memory() / 1e9, 2))
+                    mlx_peak_gb=round(mx.get_peak_memory() / 1e9, 2), footprint_gb=footprint_gb())
         return Image.fromarray(img), info

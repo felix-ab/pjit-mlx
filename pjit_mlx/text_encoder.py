@@ -274,3 +274,22 @@ class TextEncoder:
         feats = mx.concatenate(outs, axis=-1)
         mx.eval(feats)
         return feats
+
+    def encode_streaming(self, captions: list[str]) -> list[mx.array]:
+        """Same features as calling the encoder on each caption, but layer by layer: each block's weights are read
+        from disk (mx.load is lazy) when it first runs and dropped right after, so about one block is resident
+        instead of all 28. The encoder is used up afterwards."""
+        hs = [self.embed(self.token_ids(c))[None] for c in captions]
+        outs = [[] for _ in captions]
+        layers = self.model.layers
+        for i in range(len(layers)):
+            hs = [layers[i](h, None, None) for h in hs]
+            if i in self.layers:
+                for o, h in zip(outs, hs):
+                    o.append(h[0].astype(mx.bfloat16))
+            mx.eval(hs, outs)
+            layers[i] = None
+            mx.clear_cache()
+        feats = [mx.concatenate(o, axis=-1) for o in outs]
+        mx.eval(feats)
+        return feats

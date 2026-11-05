@@ -8,12 +8,17 @@ Mac, and it runs about twice as fast as PyTorch on the same machine, in under ha
 
 | M4 Pro (48 GB), one 1152×864 image, 50 steps | PyTorch 2.15 (MPS) | pjit-mlx bf16 | pjit-mlx 8-bit |
 |---|---|---|---|
-| Caption encoding | 17.5 s | 1.5 s | 1.0 s |
+| Caption encoding | 17.5 s | 1-2 s | ~1 s |
 | Sampling | 118 s | 69 s | 77 s |
 | Total, including loading | 139 s | 72 s | 79 s |
-| Peak memory | 14.9 GB | 6.4 GB | 3.6 GB |
+| Peak memory, whole process | 14.9 GB | 6.7 GB | 5.0 GB |
+| Peak memory with `--low-memory` | | 5.6 GB | **3.6 GB** |
 | Match to Linum's H100 image (PSNR) | 37.8 dB | 38.4 dB | 18.1 dB (this seed forks) |
 | Download | 18.0 GB | 11.9 GB | 6.9 GB |
+
+Peak memory is the process's peak physical footprint as macOS reports it (`proc_pid_rusage`), the same meter in
+every column; it includes MLX's buffer cache, Python and the tokenizer. MLX's own counter (`mx.get_peak_memory()`)
+reads lower and is not used for these numbers. `--low-memory` gives identical pixels: see Memory below.
 
 ## Install and run
 
@@ -26,10 +31,10 @@ pjit-mlx --tier bf16 --seeds 4 --aspect 4:3 --out portrait.png \
 That command reproduces gallery image [`b_512_s4`](https://www.linum.ai/field-notes/pjit-21k#img-b_512_s4).
 
 - **Weights:** `--tier` downloads an MLX export from Hugging Face on first use.
-  - [`bf16`](https://huggingface.co/VisualInference/P-JiT-21K-MLX-bf16): 6.4 GB peak, 11.9 GB download. It is the
-    reference precision.
-  - [`8bit`](https://huggingface.co/VisualInference/P-JiT-21K-MLX-8bit): 3.6 GB peak, 6.9 GB download. It forks on
-    some seeds, including this one (see Tiers).
+  - [`bf16`](https://huggingface.co/VisualInference/P-JiT-21K-MLX-bf16): 6.7 GB peak (5.6 GB with `--low-memory`),
+    11.9 GB download. It is the reference precision.
+  - [`8bit`](https://huggingface.co/VisualInference/P-JiT-21K-MLX-8bit): 5.0 GB peak (3.6 GB with `--low-memory`),
+    6.9 GB download. It forks on some seeds, including this one (see Tiers).
   - Without `--tier`, the released checkpoints (`Linum-AI/pjit-21k`, `Qwen/Qwen3.5-4B`, 18 GB) are converted on load.
   - `--dit DIR/dit --text-encoder DIR/text_encoder` uses a local export. Make one with
     `python -m pjit_mlx.export --out DIR [--dit-bits 8 --te-bits 8]`.
@@ -40,7 +45,7 @@ That command reproduces gallery image [`b_512_s4`](https://www.linum.ai/field-no
 ```python
 from pjit_mlx.pipeline import Pipeline
 
-pipe = Pipeline(tier="8bit")               # or Pipeline() for the released checkpoints, or Pipeline("DIR/dit", "DIR/text_encoder")
+pipe = Pipeline(tier="8bit", low_memory=True)   # or Pipeline() for the released checkpoints, or Pipeline("DIR/dit", "DIR/text_encoder")
 image, info = pipe.generate(caption, seed=4, aspect="4:3")
 image.save("out.png")
 ```
@@ -93,11 +98,11 @@ its published prompt, seed and size at the bf16 tier. All 15 come out as the sam
 
 ## Tiers
 
-- **bf16** is the reference precision. Use it whenever 6.4 GB fits.
+- **bf16** is the reference precision. Use it whenever ~7 GB fits.
 - **8-bit** quantizes every linear inside the transformer blocks and the caption projection to 8 bits (group 64). It
   also quantizes the text encoder's block projections.
   - It keeps the token embedding, patch embed, timestep MLP, AdaLN roots, attention gates and output head in bf16.
-  - It fits in 3.6 GB.
+  - It peaks at 5.0 GB for the whole process, or 3.6 GB with `--low-memory`.
   - It looks as clean as bf16 at 100%: no added grain or mesh.
   - It keeps the gallery picture on 14 of the 15 test prompts, with more fine-detail drift than bf16 (median 29.6 dB
     against 34.8 dB).
@@ -107,6 +112,28 @@ its published prompt, seed and size at the bf16 tier. All 15 come out as the sam
   - Keeping attention, the FFNs, the refiners, the AdaLN or the first and last blocks in bf16 does not close that gap
     (57-61 dB).
   - A 4-bit DiT is possible (`--dit-bits 4`), but it is not exported: it forks more.
+
+## Memory
+
+All numbers are the whole process's peak physical footprint on macOS, for one image in a fresh process.
+
+| 8-bit tier | Default | `--low-memory` |
+|---|---|---|
+| 1152×864, 67-token caption | 5.04 GB | 3.55-3.59 GB |
+| 864×1216, 102-token caption | | 3.50 GB |
+| 864×1216, 256-token caption (the maximum) | 5.02 GB | 3.51 GB |
+| bf16 tier, 1152×864 | 6.65 GB | 5.56 GB |
+
+- **Text encoder:** it always runs layer by layer. Each block's weights are read from disk when that block runs and
+  dropped right after (`mx.load` is lazy). Caption encoding peaks at ~0.6 GB with bit-identical features, and the
+  encoder and the DiT are never resident together.
+- **Default sampling:** the DiT's weights (2.35 GB at 8-bit) stay resident, and each forward is one lazy graph. Every
+  block still pending in that graph holds ~0.26 GB, about 1.3 GB per forward, and MLX's buffer cache keeps about as
+  much again between steps.
+- **`--low-memory`:** it evaluates the DiT block by block and caps MLX's buffer cache at 256 MB while sampling.
+  - The pixels are identical: every test image was bit-identical to the default run.
+  - In 50-step end-to-end runs it cost under 1% in time; a 12-step microbenchmark showed up to 8%.
+- `parity/footprint.py` measures a command's peak footprint the same way.
 
 ## Speed notes
 
@@ -127,7 +154,6 @@ Sampling time per image (50 steps) on an M4 Pro, averaged over the gallery set:
   - Fusing the q/k/v/gate projections gives no gain.
   - Quantized GEMMs are not faster at this token count.
 - The token embedding (1.27 GB) is memory-mapped and read row by row.
-- The text encoder and the DiT are never resident together.
 
 ## Limits
 

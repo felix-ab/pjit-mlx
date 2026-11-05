@@ -1,6 +1,6 @@
 [project]
 name = "pjit-mlx"
-version = "0.1.0"
+version = "0.1.1"
 description = "P-JiT 21K (Linum's pixel-space text-to-image DiT) on Apple silicon with MLX"
 readme = "README.md"
 license = "Apache-2.0"

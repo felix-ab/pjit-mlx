@@ -258,6 +258,7 @@ class PJiT(nn.Module):
         self._rope = {}
         self._fns = {}
         self.compile = True  # mx.compile each block (bit-identical, ~6% faster); masked/padded calls stay eager
+        self.low_memory = False  # evaluate block by block: each block left pending holds ~0.26 GB (same pixels, ~8% slower)
 
     def _block(self, blk, rope: bool):
         """A (compiled) call of one block; RoPE rotates the first len(cos) tokens."""
@@ -275,6 +276,11 @@ class PJiT(nn.Module):
         if key not in self._rope:
             self._rope = {key: rope_tables(self.cfg, f_p, h_p, w_p)}
         return self._rope[key]
+
+    def _sync(self, x):
+        if self.low_memory:
+            mx.eval(x)
+        return x
 
     def embed_text(self, text):
         """(B, L, 7680) caption features -> (B, L, dim) projected tokens (bf16)."""
@@ -301,21 +307,21 @@ class PJiT(nn.Module):
 
         cos, sin = self.rope(fp, hp, wp)
         for blk in self.image_refiner:
-            x_img = self._block(blk, True)(x_img, c_image, cos, sin)
+            x_img = self._sync(self._block(blk, True)(x_img, c_image, cos, sin))
         txt = text_tokens if text_tokens is not None else self.embed_text(text)
         if key_mask is None:
             for blk in self.text_refiner:
-                txt = self._block(blk, False)(txt, c_text)
+                txt = self._sync(self._block(blk, False)(txt, c_text))
         else:  # padded batch: eager, with key masks and zeroed pad rows
             for blk in self.text_refiner:
-                txt = blk(txt, c_text, None, key_mask[1], valid[1])
+                txt = self._sync(blk(txt, c_text, None, key_mask[1], valid[1]))
         seq = mx.concatenate([x_img, txt.astype(x_img.dtype) if txt.dtype != x_img.dtype else txt], axis=1)
         if key_mask is None:
             for blk in self.blocks:
-                seq = self._block(blk, True)(seq, c_image, cos, sin)
+                seq = self._sync(self._block(blk, True)(seq, c_image, cos, sin))
         else:
             for blk in self.blocks:
-                seq = blk(seq, c_image, (cos, sin, l_img), key_mask[0], valid[0])
+                seq = self._sync(blk(seq, c_image, (cos, sin, l_img), key_mask[0], valid[0]))
 
         out = self.head(seq[:, :l_img], e)
         u = out.reshape(b, fp, hp, wp, pt, ph, pw, cfg.out_channels).transpose(0, 7, 1, 4, 2, 5, 3, 6)

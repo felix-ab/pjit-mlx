@@ -25,12 +25,15 @@ def main(argv=None):
     ap.add_argument("--guidance", type=float, default=15.0)
     ap.add_argument("--negative", default="")
     ap.add_argument("--tier", choices=sorted(TIERS),
-                    help="download and use a published MLX tier: 8bit (3.6 GB peak, 6.9 GB download) or bf16 "
-                         "(6.4 GB peak, 11.9 GB download)")
+                    help="download and use a published MLX tier: 8bit (5.0 GB peak, 3.6 GB with --low-memory; 6.9 GB "
+                         "download) or bf16 (6.7 GB peak, 5.6 GB with --low-memory; 11.9 GB download)")
     ap.add_argument("--dit", help="exported MLX DiT directory (default: convert the released checkpoint)")
     ap.add_argument("--text-encoder", help="exported MLX text-encoder directory (default: Qwen/Qwen3.5-4B)")
     ap.add_argument("--dit-bits", type=int, choices=(4, 6, 8), help="quantize the reference DiT on the fly")
     ap.add_argument("--te-bits", type=int, choices=(4, 6, 8), help="quantize the text encoder on the fly")
+    ap.add_argument("--low-memory", action="store_true",
+                    help="evaluate the DiT block by block and cap MLX's buffer cache: the 8-bit tier peaks at 3.6 GB "
+                         "instead of 5.0 GB (whole process); same pixels, at most a few percent slower")
     ap.add_argument("--upsample", action="store_true",
                     help="rewrite a short prompt into a dense caption with Linum's upsampler (Claude via OpenRouter; "
                          "needs OPENROUTER_API_KEY; sends the prompt to OpenRouter)")
@@ -51,7 +54,7 @@ def main(argv=None):
         if res.error:
             raise SystemExit(f"upsampler error: {res.error}; no image generated")
         prompt = res.upsampled_prompt
-    pipe = Pipeline(a.dit, a.text_encoder, a.dit_bits, a.te_bits, tier=a.tier)
+    pipe = Pipeline(a.dit, a.text_encoder, a.dit_bits, a.te_bits, tier=a.tier, low_memory=a.low_memory)
     seeds = [int(s) for s in a.seeds.split(",") if s.strip()]
     out = Path(a.out)
     for seed in seeds:
