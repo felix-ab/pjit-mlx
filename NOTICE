@@ -1,0 +1,13 @@
+pjit-mlx
+Copyright 2026 the pjit-mlx authors. Licensed under the Apache License, Version 2.0 (LICENSE).
+
+This is an MLX port of P-JiT 21K by Linum Inc. (https://github.com/Linum-AI/pjit-21k,
+https://huggingface.co/Linum-AI/pjit-21k), Apache License 2.0. The model architecture, sampler and
+seeded-noise scheme follow Linum's reference implementation; the released weights are Linum's.
+
+The caption encoder is Qwen3.5-4B by the Qwen team, Alibaba Cloud (https://huggingface.co/Qwen/Qwen3.5-4B),
+Apache License 2.0.
+
+pjit_mlx/upsampler.py is Linum's pjit_21k/upsampler.py, unchanged (Apache-2.0).
+
+pjit_mlx/text_encoder.py adapts the transformers-faithful Qwen3.5 layers of moss-image-mlx (Apache-2.0).

@@ -1,0 +1,7 @@
+{
+ "timesteps_equal": true,
+ "image_psnr_db": 70.7953588043693,
+ "image_max_abs": 1,
+ "image_identical_pixels_pct": 99.45856730143228,
+ "sample_s": 27.04
+}

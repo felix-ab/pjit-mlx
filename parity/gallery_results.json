@@ -1,0 +1,128 @@
+[
+ {
+  "key": "b_104_s0",
+  "category": "person",
+  "seed": 0,
+  "width": 1152,
+  "height": 864,
+  "psnr_bf16": 30.28,
+  "psnr_8bit": 26.03
+ },
+ {
+  "key": "b_023_s1",
+  "category": "person",
+  "seed": 1,
+  "width": 864,
+  "height": 1216,
+  "psnr_bf16": 43.12,
+  "psnr_8bit": 25.97
+ },
+ {
+  "key": "b_145_s4",
+  "category": "animal",
+  "seed": 4,
+  "width": 1024,
+  "height": 1024,
+  "psnr_bf16": 40.93,
+  "psnr_8bit": 33.27
+ },
+ {
+  "key": "b_289_s2",
+  "category": "animal",
+  "seed": 2,
+  "width": 1024,
+  "height": 1024,
+  "psnr_bf16": 35.96,
+  "psnr_8bit": 29.98
+ },
+ {
+  "key": "b_097_s0",
+  "category": "building",
+  "seed": 0,
+  "width": 1152,
+  "height": 864,
+  "psnr_bf16": 34.83,
+  "psnr_8bit": 31.1
+ },
+ {
+  "key": "b_006_s3",
+  "category": "building",
+  "seed": 3,
+  "width": 1152,
+  "height": 864,
+  "psnr_bf16": 36.83,
+  "psnr_8bit": 35.7
+ },
+ {
+  "key": "b_090_s1",
+  "category": "product",
+  "seed": 1,
+  "width": 1152,
+  "height": 864,
+  "psnr_bf16": 38.68,
+  "psnr_8bit": 34.32
+ },
+ {
+  "key": "b_295_s3",
+  "category": "product",
+  "seed": 3,
+  "width": 1152,
+  "height": 864,
+  "psnr_bf16": 29.51,
+  "psnr_8bit": 24.54
+ },
+ {
+  "key": "b_195_s2",
+  "category": "landscape",
+  "seed": 2,
+  "width": 1280,
+  "height": 720,
+  "psnr_bf16": 32.83,
+  "psnr_8bit": 29.64
+ },
+ {
+  "key": "b_383_s1",
+  "category": "landscape",
+  "seed": 1,
+  "width": 1152,
+  "height": 864,
+  "psnr_bf16": 40.58,
+  "psnr_8bit": 38.63
+ },
+ {
+  "key": "b_314_s1",
+  "category": "stylized",
+  "seed": 1,
+  "width": 1152,
+  "height": 864,
+  "psnr_bf16": 24.54,
+  "psnr_8bit": 27.33
+ },
+ {
+  "key": "b_367_s0",
+  "category": "stylized",
+  "seed": 0,
+  "width": 1024,
+  "height": 1024,
+  "psnr_bf16": 27.38,
+  "psnr_8bit": 25.89
+ },
+ {
+  "key": "b_215_s1",
+  "category": "stylized",
+  "seed": 1,
+  "width": 1248,
+  "height": 832,
+  "psnr_bf16": 34.61,
+  "psnr_8bit": 30.08
+ },
+ {
+  "key": "b_175_s0",
+  "category": "product",
+  "seed": 0,
+  "width": 1248,
+  "height": 832,
+  "psnr_bf16": 31.38,
+  "psnr_8bit": 26.91
+ }
+]

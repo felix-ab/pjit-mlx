@@ -1,0 +1,30 @@
+[project]
+name = "pjit-mlx"
+version = "0.1.0"
+description = "P-JiT 21K (Linum's pixel-space text-to-image DiT) on Apple silicon with MLX"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = [
+    "mlx==0.32.4",
+    "mlx-lm==0.32.2",
+    "transformers>=5.20",
+    "huggingface_hub>=0.30",
+    "numpy",
+    "pillow",
+]
+
+[project.urls]
+Homepage = "https://github.com/felix-ab/pjit-mlx"
+"Weights (bf16)" = "https://huggingface.co/VisualInference/P-JiT-21K-MLX-bf16"
+"Weights (8-bit)" = "https://huggingface.co/VisualInference/P-JiT-21K-MLX-8bit"
+
+[project.scripts]
+pjit-mlx = "pjit_mlx.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["pjit_mlx"]

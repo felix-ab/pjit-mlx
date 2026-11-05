@@ -1,0 +1,20 @@
+{
+ "bf16": {
+  "sample_s": 69.24,
+  "text_s": 1.52,
+  "load_s": 0.81,
+  "tokens": 67,
+  "peak_gb": 6.38,
+  "identical_to_on_the_fly": true,
+  "max_abs_diff": 0
+ },
+ "8bit": {
+  "sample_s": 77.38,
+  "text_s": 0.95,
+  "load_s": 0.55,
+  "tokens": 67,
+  "peak_gb": 3.64,
+  "identical_to_on_the_fly": true,
+  "max_abs_diff": 0
+ }
+}
